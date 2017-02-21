@@ -9,20 +9,13 @@
 
 library(shiny)
 library(ggplot2)
-library(dplyr)
-library(lubridate)
 
 # Ejecutar script
 source("C://Users//Jinvestigador02//Documents//RIPS//CodigoHospitalizacion.R")
-
 ## Generar los tiempos
 hospitalizacion$Tiempo <- difftime(hospitalizacion$FECHA.EGRESO.COMP
                                    ,hospitalizacion$FECHA.INGRESO.COMP, 
                                    units = "hours")
-
-## Generar variables de agrupacion, por mes y por dia de la semana
-hospitalizacion$Mes <- months(hospitalizacion$FECHA.EGRESO.COMP)
-hospitalizacion$diaSemana <- weekdays(hospitalizacion$FECHA.EGRESO.COMP)
 
 # Definimos un app para graficar el indicador Promedio de permanencia de un paciente con histograma
 ui <- fluidPage(
@@ -33,22 +26,16 @@ ui <- fluidPage(
    # caracteristicas y discriminantes de la grafica
    sidebarLayout(
       sidebarPanel(
-         checkboxGroupInput("checkbox",
-                     "Seleccione mes:",
-                     choices = unique(hospitalizacion$Mes),
-                     selected = unique(hospitalizacion$Mes))
+         sliderInput("bins",
+                     "Number of bins:",
+                     min = 1,
+                     max = 1000,
+                     value = 600)
       ),
       
       # Show a plot of the generated distribution
       mainPanel(
-         
-         tabsetPanel(
-           tabPanel("Plot", plotOutput("histograma")),
-           tabPanel("Summary", verbatimTextOutput("summary")),
-           tabPanel("Table", tableOutput("table"))
-         )
-         
-      
+         plotOutput("histograma")
       )
    )
 )
@@ -58,32 +45,16 @@ server <- function(input, output) {
    
    output$histograma <- renderPlot({
       
-     # Filtrar Datos y agrupar segun la eleccion
-     hosp <- hospitalizacion %>% filter(Mes %in% input$checkbox) %>% select(Tiempo, Mes) %>%
-       group_by(Mes) %>% summarize(Tiempo.Promedio = mean(Tiempo))
+     # generar las barras input$bins from ui.R
+     x <- hospitalizacion$Tiempo
+     bins <- seq(min(x), max(x), length.out = input$bins + 1)
     
       # draw the histogram with the specified number of bins
-      ggplot(data = hosp, aes(x = Mes, y = Tiempo.Promedio)) + 
-        geom_col(fill = "dark green", color = "steel blue") + geom_smooth()
-   })
-   
-   output$summary <- renderPrint({
-     # Filtrar Datos y agrupar segun la eleccion
-     hosp <- hospitalizacion %>% filter(Mes %in% input$checkbox) %>% select(Tiempo, Mes) %>%
-       group_by(Mes) %>% summarize(Tiempo.Promedio = mean(Tiempo))
-     
-     summary(as.numeric(hosp$Tiempo.Promedio))
-   })
-   
-   output$table <- renderTable({
-     # Filtrar Datos y agrupar segun la eleccion
-     hosp <- hospitalizacion %>% filter(Mes %in% input$checkbox) %>% select(Tiempo, Mes) %>%
-       group_by(Mes) %>% summarize(Tiempo.Promedio = mean(Tiempo))
-     
-     hosp
+      ggplot(data = hospitalizacion, aes(x = Tiempo)) + geom_histogram(breaks = bins, 
+                                                                       fill = "green", color = "steel blue") + 
+        coord_cartesian(xlim = c(0,1000))
    })
 }
-
 
 # Run the application 
 shinyApp(ui = ui, server = server)
